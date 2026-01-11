@@ -812,7 +812,7 @@ class TeklaEngine:
         disp_size = str(size)
         if disp_size.endswith(".0"): disp_size = disp_size[:-2]
         
-        sw_label = "Site" if ref_type == "SITE" else "Shop"
+        sw_label = "Site" if "SITE" in str(ref_type).upper() else "Shop"
         summary = (f"• Selected: M{disp_size} x {int(length)} ({std})\n"
                    f"• Type: {sw_label}\n"
                    f"• Found: {matches.Count} Groups ({total_pcs} Bolts)")
@@ -937,7 +937,7 @@ class TeklaEngine:
                 f"EDGE DISTANCE: {self.get_p(obj,'EDGE_DISTANCE','double')}",
                 # HOLE TOLERANCE is safer via Report Property or specific prop check
                 f"HOLE TOLERANCE: {self.get_p(obj,'HOLE_TOLERANCE','double')}",
-                f"ASSEMBLY TYPE: {'Site' if str(obj.BoltType) == 'SITE' else 'Workshop'}",
+                f"ASSEMBLY TYPE: {'Site' if 'SITE' in str(obj.BoltType).upper() else 'Workshop'}",
                 f"BOLT QTY: {bolt_qty}",
                 f"PHASE: {p_phase}"
             ]
@@ -986,6 +986,34 @@ class TeklaEngine:
                                  ok, sval = target.GetReportProperty("PHASE", sval)
                                  if ok and sval: v = sval
                 except: pass
+
+            # --- SPECIAL HANDLING FOR PAINTING AREA ---
+            if p == "AREA_PAINT":
+                if v == 0.0 or v == "0.0":
+                    v = self.get_p(obj, "AREA_NET", "double")
+                    if v == 0.0:
+                        v = self.get_p(obj, "AREA", "double")
+                
+                # Convert to m2 (Tekla usually returns mm2 or just raw area unit)
+                try:
+                    m2 = round(float(v) / 1000000.0, 3)
+                    v = f"{v} (≈ {m2} m²)"
+                except: pass
+
+            # --- SPECIAL HANDLING FOR NUM OF PARTS ---
+            if p == "NUMBER_OF_PARTS":
+                if isinstance(obj, Assembly):
+                    # Robust count: Main Part (1) + Secondaries
+                    try:
+                        secs = obj.GetSecondaries()
+                        count = 1 + (secs.Count if hasattr(secs, "Count") else 0)
+                        v = float(count)
+                    except: pass
+                
+                # Add marker for the UI to inject the [List] button
+                if isinstance(obj, Assembly):
+                    data.append(f"{l}_BTN_LIST: {v}")
+                    continue
 
             data.append(f"{l}: {v}")
         return "\n".join(data)
@@ -1147,7 +1175,7 @@ class RibbonToolbar:
         webbrowser.open("https://github.com/sponsors/KOApps-ui")
 
     def create_ribbon_button(self, parent, icon, text, cmd, icon_color=None, hint=None):
-        btn_frame = tk.Frame(parent, bg=self.ribbon_bg, cursor="hand2", width=80, height=75)
+        btn_frame = tk.Frame(parent, bg=self.ribbon_bg, cursor="hand2", width=80, height=75, highlightthickness=1, highlightbackground=self.ribbon_bg)
         btn_frame.pack(side='left', padx=1, pady=5)
         btn_frame.pack_propagate(False)
         f_color = icon_color if icon_color else self.text_color
@@ -1187,19 +1215,22 @@ class RibbonToolbar:
         
         def on_enter(e):
             if not self.is_minimized:
-                bg = "#eeeeee"
-                btn_frame.config(bg=bg)
+                bg = "#e8e8e8" # Slightly darker for better visibility
+                btn_frame.config(bg=bg, highlightthickness=1, highlightbackground="#0078d7")
                 text_label.config(bg=bg)
                 for w in icon_widgets:
                     w.config(bg=bg)
         def on_leave(e):
             bg = self.ribbon_bg
-            btn_frame.config(bg=bg)
+            btn_frame.config(bg=bg, highlightthickness=1, highlightbackground=bg)
             text_label.config(bg=bg)
             for w in icon_widgets:
                 w.config(bg=bg)
         
         btn_frame.bind("<Enter>", on_enter); btn_frame.bind("<Leave>", on_leave)
+        text_label.bind("<Enter>", on_enter); text_label.bind("<Leave>", on_leave)
+        for w in icon_widgets:
+            w.bind("<Enter>", on_enter); w.bind("<Leave>", on_leave)
         
         # Bind command to all relevant widgets
         btn_frame.bind("<Button-1>", lambda e: cmd())
@@ -1587,6 +1618,13 @@ class RibbonToolbar:
                 # Standard Property
                 prop_row = tk.Frame(section_frame, bg="white")
                 prop_row.pack(fill='x', pady=0)
+                
+                # Check for List Button Marker
+                has_list_btn = False
+                if key.endswith("_BTN_LIST"):
+                    key = key.replace("_BTN_LIST", "")
+                    has_list_btn = True
+
                 tk.Label(prop_row, text=key, font=('Segoe UI', 8), bg="white", fg="#5a6c7d", width=22, anchor='w').pack(side='left')
                 
                 val_color = "#2c3e50"
@@ -1597,7 +1635,17 @@ class RibbonToolbar:
                     val_font = ('Segoe UI', 8, 'bold')
                 except: pass
                 
-                tk.Label(prop_row, text=val, font=val_font, bg="white", fg=val_color, anchor='w', wraplength=260, justify='left').pack(side='left', fill='x', expand=True)
+                val_label = tk.Label(prop_row, text=val, font=val_font, bg="white", fg=val_color, anchor='w', justify='left')
+                val_label.pack(side='left', fill='x', expand=True)
+
+                if has_list_btn and isinstance(target_obj, Assembly):
+                    # Prominent orange styling for the LIST button
+                    btn_list = tk.Button(prop_row, text=" LIST ", font=('Segoe UI', 7, 'bold'), 
+                                       bg="#e67e22", fg="white", activebackground="#d35400", activeforeground="white",
+                                       bd=0, padx=6, pady=1, cursor="hand2", 
+                                       command=lambda: self.show_parts_popup(target_obj))
+                    btn_list.pack(side='right', padx=2)
+                    CreateToolTip(btn_list, "Show all parts in this assembly")
             
             # B) Plain Text (Paragraphs)
             else:
@@ -1664,6 +1712,167 @@ class RibbonToolbar:
             
             pop.geometry(f"480x{final_h}+{x_pos}+{y_pos}")
         except: pass
+
+    def show_parts_popup(self, assembly):
+        if not assembly: return
+        
+        p_pop = tk.Toplevel(self.root)
+        p_pop.title("Parts List")
+        p_pop.overrideredirect(True)
+        p_pop.attributes("-topmost", True)
+        p_pop.configure(bg='white', highlightthickness=1, highlightbackground="#2980b9")
+        
+        # Center relative to current popup
+        try:
+            px = self.active_popup.winfo_x() + 50
+            py = self.active_popup.winfo_y() + 100
+            p_pop.geometry(f"450x400+{px}+{py}") # Wider and taller for table
+        except:
+            p_pop.geometry("450x400")
+
+        header = tk.Frame(p_pop, bg="#2980b9", height=30)
+        header.pack(fill='x')
+        
+        # Dragging logic
+        def start_pop_drag(e): p_pop._px, p_pop._py = e.x, e.y
+        def do_pop_drag(e): p_pop.geometry(f"+{p_pop.winfo_x()+(e.x-p_pop._px)}+{p_pop.winfo_y()+(e.y-p_pop._py)}")
+        header.bind("<Button-1>", start_pop_drag)
+        header.bind("<B1-Motion>", do_pop_drag)
+
+        tk.Label(header, text="ASSEMBLY PARTS", font=('Segoe UI', 9, 'bold'), bg="#2980b9", fg="white").pack(side='left', padx=10)
+        
+        close_btn = tk.Label(header, text="✕", font=('Segoe UI', 10), bg="#2980b9", fg="white", cursor="hand2", padx=10)
+        close_btn.pack(side='right')
+        close_btn.bind("<Button-1>", lambda e: p_pop.destroy())
+
+        body = tk.Frame(p_pop, bg="white", padx=15, pady=10)
+        body.pack(fill='both', expand=True)
+        
+        # Get Data
+        try:
+            parts_data = {} # (pos, prof, mat) -> qty
+            raw_bolts = {} # ID -> (std, size, qty)
+
+            def log_bolt(b):
+                if not b: return
+                try:
+                    # Capture unique bolts by ID
+                    bid = b.Identifier.ID
+                    if bid in raw_bolts: return
+                    
+                    b_type = str(b.BoltType).upper()
+                    # We will show the bolt regardless of type if it's connected to our assembly
+                    # since the user wants to see "everything belonging to the assembly"
+                    
+                    b_size = b.BoltSize
+                    # Robust length check
+                    b_len = 0.0; ok_l, b_len = b.GetReportProperty("LENGTH", b_len)
+                    if not ok_l: b_len = 0.0 
+                    
+                    size_str = f"{b_size}x{int(b_len)}"
+                    std_str = b.BoltStandard
+                    
+                    b_qty = 0
+                    try:
+                        if hasattr(b, "BoltPositions") and b.BoltPositions:
+                            b_qty = b.BoltPositions.Count
+                    except: pass
+                    
+                    if b_qty == 0:
+                        ok, val = b.GetReportProperty("NUMBER", 0.0)
+                        b_qty = int(val) if ok else 0
+                    
+                    if b_qty > 0:
+                        raw_bolts[bid] = (std_str, size_str, b_qty)
+                except: pass
+
+            # 1. Collect Parts
+            scan_parts = []
+            mp = assembly.GetMainPart()
+            if mp: scan_parts.append(mp)
+            
+            secs = assembly.GetSecondaries()
+            enum_s = secs.GetEnumerator()
+            while enum_s.MoveNext():
+                item = enum_s.Current
+                if isinstance(item, Part):
+                    scan_parts.append(item)
+            
+            # 2. Collect Bolts: Strategy A - Assembly Level
+            try:
+                be_a = assembly.GetBolts()
+                while be_a.MoveNext():
+                    log_bolt(be_a.Current)
+            except: pass
+            
+            # 3. Collect Bolts: Strategy B - Part Level (Catch Site Bolts too)
+            for p in scan_parts:
+                try:
+                    be_p = p.GetBolts()
+                    while be_p.MoveNext():
+                        log_bolt(be_p.Current)
+                except: pass
+
+            # 4. Process Parts (For listing)
+            for p in scan_parts:
+                pos = self.engine.get_p(p, "PART_POS", "string") or "?"
+                prof = self.engine.get_p(p, "PROFILE", "string") or "?"
+                mat = self.engine.get_p(p, "MATERIAL", "string") or "?"
+                key = (pos, prof, mat)
+                parts_data[key] = parts_data.get(key, 0) + 1
+
+            # 3. Finalize Bolt Tally (Summing up same types)
+            final_bolts = {} # (std, size) -> total_qty
+            for bid in raw_bolts:
+                std, sz, q = raw_bolts[bid]
+                k = (std, sz)
+                final_bolts[k] = final_bolts.get(k, 0) + q
+
+            # --- RENDER PARTS ---
+            tk.Label(body, text="PARTS", font=('Segoe UI', 9, 'bold'), bg="white", fg="#2c3e50").pack(anchor='w', pady=(0, 5))
+            
+            h_frame = tk.Frame(body, bg="#f8f9fa")
+            h_frame.pack(fill='x')
+            cols = [("QTY", 5), ("POS", 10), ("PROFILE", 15), ("MATERIAL", 12)]
+            for t, w in cols:
+                tk.Label(h_frame, text=t, font=('Segoe UI', 7, 'bold'), bg="#f8f9fa", fg="#7f8c8d", width=w, anchor='w').pack(side='left')
+            
+            tk.Frame(body, bg="#e0e0e0", height=1).pack(fill='x', pady=2)
+            
+            for (pos, prof, mat), qty in sorted(parts_data.items()):
+                row = tk.Frame(body, bg="white")
+                row.pack(fill='x')
+                tk.Label(row, text=str(qty), font=('Segoe UI', 8), bg="white", width=5, anchor='w').pack(side='left')
+                tk.Label(row, text=pos, font=('Segoe UI', 8, 'bold'), bg="white", fg="#e67e22", width=10, anchor='w').pack(side='left')
+                tk.Label(row, text=prof, font=('Segoe UI', 8), bg="white", width=15, anchor='w').pack(side='left')
+                tk.Label(row, text=mat, font=('Segoe UI', 8), bg="white", width=12, anchor='w').pack(side='left')
+
+            # --- RENDER BOLTS ---
+            if final_bolts:
+                tk.Frame(body, bg="white", height=15).pack()
+                tk.Label(body, text="BOLTS", font=('Segoe UI', 9, 'bold'), bg="white", fg="#2c3e50").pack(anchor='w', pady=(0, 5))
+                
+                bh_frame = tk.Frame(body, bg="#f8f9fa")
+                bh_frame.pack(fill='x')
+                bcols = [("QTY", 5), ("GRADE", 10), ("SIZE", 20)]
+                for t, w in bcols:
+                    tk.Label(bh_frame, text=t, font=('Segoe UI', 7, 'bold'), bg="#f8f9fa", fg="#7f8c8d", width=w, anchor='w').pack(side='left')
+                
+                tk.Frame(body, bg="#e0e0e0", height=1).pack(fill='x', pady=2)
+                
+                for (std, size), qty in sorted(final_bolts.items()):
+                    row = tk.Frame(body, bg="white")
+                    row.pack(fill='x')
+                    tk.Label(row, text=str(qty), font=('Segoe UI', 8), bg="white", width=5, anchor='w').pack(side='left')
+                    tk.Label(row, text=std, font=('Segoe UI', 8), bg="white", width=10, anchor='w').pack(side='left')
+                    tk.Label(row, text=size, font=('Segoe UI', 8, 'bold'), bg="white", fg="#2980b9", width=20, anchor='w').pack(side='left')
+
+        except Exception as e:
+            tk.Label(body, text=f"Error: {e}", bg="white", fg="red", font=('Segoe UI', 8)).pack()
+
+        # Simple click outside or anywhere to close - DISABLED for better stability
+        # p_pop.bind("<FocusOut>", lambda e: p_pop.destroy())
+        # p_pop.focus_set()
 
     def action(self, t): 
         if not TEKLA_AVAILABLE:

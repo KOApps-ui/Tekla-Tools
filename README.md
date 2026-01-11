@@ -1,8 +1,24 @@
-# 🛠️ TEKLA TOOLS - v1.0.1
+# 🛠️ TEKLA TOOLS - v1.0.1.1
 
 ![Tekla Tools Logo](assets/logo.png)
 
 A comprehensive automation and utility suite for **Tekla Structures**, designed to streamline modeling workflows, find identical assemblies/parts, and audit drawing status with a modern, glassmorphic UI.
+
+---
+
+### 🚀 Latest Updates (v1.0.1.1)
+
+#### 🇬🇧 English
+- **New Feature: Assembly Parts List:** Added a "LIST" button in assembly details. View parts (pos, profile, material) and bolts (qty, grade, size) in a structured table directly in the UI.
+- **Painting Area Fix:** Resolved issues where "PAINTING AREA" showed 0.0. Added m² conversion display for better readability.
+- **Improved Bolt Detection:** Re-vamped bolt collection logic to capture all connected bolts (Site & Workshop) without missing any components.
+- **Visual Enhancements:** Added premium hover effects, border highlights for buttons, and made the parts popup draggable.
+
+#### 🇹🇷 Türkçe
+- **Yeni Özellik: Montaj Parça Listesi:** Montaj detaylarına "LIST" butonu eklendi. Parça pozları, profilleri, malzemeleri ve civata detayları artık şık bir tabloda görülebilir.
+- **Boyama Alanı Düzeltmesi:** "PAINTING AREA" kısmının 0.0 gelme sorunu çözüldü. Ham verilere ek olarak m² birimi eklendi.
+- **Gelişmiş Civata Algılama:** Atölye ve şantiye civatalarının tamamını yakalayan, çok daha agresif ve doğru bir tarama motoruna geçildi.
+- **Arayüz İyileştirmeleri:** Butonlara hover efektleri ve çerçeve vurguları eklendi. Parça listesi penceresi artık sürüklenebilir.
 
 ---
 
