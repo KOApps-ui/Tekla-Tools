@@ -66,6 +66,16 @@ The executable will be located in the `dist/` folder.
 
 ---
 
+## ❤️ Destek (Support)
+
+Bu araç tamamen ücretsiz ve açık kaynaklıdır. Eğer iş akışınıza katkı sağlıyorsa ve geliştirmelere destek olmak isterseniz bana GitHub Sponsors üzerinden destek verebilirsiniz.
+
+[![](https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8aba)](https://github.com/sponsors/KOApps-ui)
+
+Desteğiniz, yeni özelliklerin (Tekla 2025+ uyumluluğu, yeni analiz araçları vb.) daha hızlı geliştirilmesine yardımcı olur.
+
+---
+
 ## 📜 License
 This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
 
