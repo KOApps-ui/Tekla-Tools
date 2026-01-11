@@ -1,0 +1,7 @@
+psutil
+pyinstaller
+python-interface
+clr-loader
+pythonnet
+Pillow
+requests

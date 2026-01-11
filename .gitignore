@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Build and Dist
+build/
+dist/
+*.spec
+
+# Local config and logs
+tekla_path.txt
+debug_log.txt
+drawing_check_debug.txt
+*.log
+
+# Assets that might be generated
+logo.ico
+# asm_icon.png  <-- Keep this as it's a resource used by the app
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Tekla local files (if any)
+*.db
+*.log
+*.bak
+TeklaTools_Backup.exe
+RUN_TEKLA_TOOLS.zip
