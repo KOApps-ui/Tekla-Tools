@@ -36,7 +36,7 @@ def build():
 
     # 2. Build Arguments
     # RENAMED to force Windows Explorer to refresh its icon cache
-    exe_name = "TeklaTools_Elite_v1.0.1.1" 
+    exe_name = "TeklaTools.v1.0.1.1" 
     
     args = [
         'select_assemblies.py',
